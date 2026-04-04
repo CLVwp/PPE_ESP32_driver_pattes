@@ -25,19 +25,30 @@ void pwmWriteUs(uint8_t channel, uint16_t us) {
   ledcWrite(channel, duty);
 }
 
-void initPwm() {
-  for (int ch = 0; ch < 8; ch++) {
-    ledcSetup(ch, LEDC_FREQ_HZ, LEDC_RES_BITS);
-    ledcAttachPin(SERVO_PINS[ch], ch);
-    pwmWriteUs(ch, degToUs(90.f));
+uint8_t logicalDegToPwmDeg(uint8_t channel, uint8_t logicalDeg) {
+  if (SERVO_ANGLE_MIRROR[channel]) {
+    return static_cast<uint8_t>(constrain(180 - logicalDeg, 0, 180));
   }
+  return logicalDeg;
 }
 
 void computeStandAngles(uint8_t out[8]) {
-  for (int i = 0; i < 8; i++) {
-    const float deg =
-        (i % 2 == 0) ? NEUTRAL_HIP_DEG : NEUTRAL_KNEE_DEG;
-    out[i] = static_cast<uint8_t>(constrain(deg, 0.f, 180.f));
+  for (int leg = 0; leg < 4; leg++) {
+    out[leg * 2] =
+        static_cast<uint8_t>(constrain(NEUTRAL_SHOULDER_DEG, 0.f, 180.f));
+    out[leg * 2 + 1] =
+        static_cast<uint8_t>(constrain(NEUTRAL_KNEE_DEG, 0.f, 180.f));
+  }
+}
+
+void initPwm() {
+  uint8_t stand[8];
+  computeStandAngles(stand);
+  for (int ch = 0; ch < 8; ch++) {
+    ledcSetup(ch, LEDC_FREQ_HZ, LEDC_RES_BITS);
+    ledcAttachPin(SERVO_PINS[ch], ch);
+    const uint8_t pwmDeg = logicalDegToPwmDeg(ch, stand[ch]);
+    pwmWriteUs(ch, degToUs(static_cast<float>(pwmDeg)));
   }
 }
 
@@ -47,11 +58,14 @@ void computeWalkAngles(float phase01, uint8_t out[8]) {
 
   for (int leg = 0; leg < 4; leg++) {
     const float s = sinf(p + off[leg]);
-    const float hip = NEUTRAL_HIP_DEG + WALK_HIP_SWING_DEG * s;
+    const float shoulder =
+        NEUTRAL_SHOULDER_DEG + WALK_SHOULDER_SWING_DEG * s;
     const float knee =
         NEUTRAL_KNEE_DEG + WALK_KNEE_LIFT_DEG * fmaxf(0.f, s);
-    out[leg * 2] = static_cast<uint8_t>(constrain(hip, 0.f, 180.f));
-    out[leg * 2 + 1] = static_cast<uint8_t>(constrain(knee, 0.f, 180.f));
+    out[leg * 2] =
+        static_cast<uint8_t>(constrain(shoulder, 0.f, 180.f));
+    out[leg * 2 + 1] =
+        static_cast<uint8_t>(constrain(knee, 0.f, 180.f));
   }
 }
 
@@ -69,6 +83,7 @@ void taskServos(void *pvParameters) {
   computeStandAngles(angles);
 
   TickType_t lastWake = xTaskGetTickCount();
+  TickType_t lastTick = lastWake;
   const TickType_t period = pdMS_TO_TICKS(20);
 
   for (;;) {
@@ -105,8 +120,8 @@ void taskServos(void *pvParameters) {
 
     const TickType_t now = xTaskGetTickCount();
     const float dtMs =
-        static_cast<float>(pdTICKS_TO_MS(now - lastWake));
-    lastWake = now;
+        static_cast<float>(pdTICKS_TO_MS(now - lastTick));
+    lastTick = now;
 
     switch (mode) {
       case LegCtrlMode::Stand:
@@ -130,7 +145,8 @@ void taskServos(void *pvParameters) {
     }
 
     for (int ch = 0; ch < 8; ch++) {
-      pwmWriteUs(ch, degToUs(static_cast<float>(angles[ch])));
+      const uint8_t pwmDeg = logicalDegToPwmDeg(ch, angles[ch]);
+      pwmWriteUs(ch, degToUs(static_cast<float>(pwmDeg)));
     }
 
     if (mutexRobotRuntime != nullptr &&
