@@ -1,5 +1,5 @@
 #pragma once
 
-// Tâche RTOS qui sérialise les données capteurs en JSON et les envoie sur Serial
+// Tâche RTOS : lecture des commandes JSON sur Serial + émission télémétrie (une ligne JSON / 50 ms)
 void taskJson(void *pvParameters);
 

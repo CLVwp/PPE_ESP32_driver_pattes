@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PlatformIO: moniteur série (clavier → ESP32)",
+      "type": "shell",
+      "command": "pio device monitor -b 115200 --echo",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "focus": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}
