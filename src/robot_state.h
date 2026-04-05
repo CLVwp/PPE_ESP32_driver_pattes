@@ -5,11 +5,12 @@
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 
-enum class LegCtrlMode : uint8_t { Stand, Walk, Pose };
+enum class LegCtrlMode : uint8_t { Stand, StandLowGround, Walk, Pose };
 
 enum class RobotCmdKind : uint8_t {
   None,
   ModeStand,
+  ModeStandLowGround,
   ModeWalk,
   SetWalkSpeed,
   ServoAngle,

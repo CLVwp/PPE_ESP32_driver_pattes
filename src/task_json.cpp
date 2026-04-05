@@ -15,6 +15,7 @@
  *
  * Pi → ESP32  (commandes) :
  *   {"t":"cmd","m":"stand"}
+ *   {"t":"cmd","m":"stand_low"}   // stand bas (IK pied sous épaule, hauteurs dans robot_config.h)
  *   {"t":"cmd","m":"walk","v":0.7}     // v optionnel, 0.1–1.0 = vitesse relative
  *   {"t":"cmd","m":"speed","v":0.5}    // en mode marche
  *   {"t":"srv","i":0,"a":90}           // servo i (0–7), angle °, passe en mode pose
@@ -60,6 +61,8 @@ static const char *modeToStr(LegCtrlMode m) {
   switch (m) {
     case LegCtrlMode::Stand:
       return "stand";
+    case LegCtrlMode::StandLowGround:
+      return "stand_low";
     case LegCtrlMode::Walk:
       return "walk";
     case LegCtrlMode::Pose:
@@ -132,6 +135,8 @@ void handleOneLine(char *line) {
   RobotCommandMsg msg = {};
   if (strcmp(m, "stand") == 0) {
     msg.kind = RobotCmdKind::ModeStand;
+  } else if (strcmp(m, "stand_low") == 0) {
+    msg.kind = RobotCmdKind::ModeStandLowGround;
   } else if (strcmp(m, "walk") == 0) {
     msg.kind = RobotCmdKind::ModeWalk;
     msg.value = doc["v"] | 0.55f;
