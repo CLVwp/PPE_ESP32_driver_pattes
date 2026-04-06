@@ -83,6 +83,12 @@ void computeStandLowGroundAngles(uint8_t out[8]) {
   }
 }
 
+void computeStandLowGorillaAngles(uint8_t out[8]) {
+  for (int i = 0; i < 8; i++) {
+    out[i] = static_cast<uint8_t>(constrain(STAND_LOW_GORILLA_DEG[i], 0.f, 180.f));
+  }
+}
+
 /** Inverse (approx.) de l’épaule IK : hauteur sous verticale depuis l’angle épaule logique. */
 float estimateHeightMmFromShoulder(int legIdx, uint8_t shoulderDeg) {
   const float S = static_cast<float>(shoulderDeg);
@@ -96,7 +102,7 @@ float estimateHeightMmFromShoulder(int legIdx, uint8_t shoulderDeg) {
 
 void initPwm() {
   uint8_t stand[8];
-  computeStandAngles(stand);
+  computeStandLowGroundAngles(stand);
   for (int ch = 0; ch < 8; ch++) {
     ledcSetup(ch, LEDC_FREQ_HZ, LEDC_RES_BITS);
     ledcAttachPin(SERVO_PINS[ch], ch);
@@ -111,14 +117,120 @@ void computeWalkAngles(float phase01, uint8_t out[8]) {
 
   for (int leg = 0; leg < 4; leg++) {
     const float s = sinf(p + off[leg]);
-    const float shoulder =
-        NEUTRAL_SHOULDER_DEG + WALK_SHOULDER_SWING_DEG * s;
-    const float knee =
-        NEUTRAL_KNEE_DEG + WALK_KNEE_LIFT_DEG * fmaxf(0.f, s);
+    float shoulderSwing = WALK_SHOULDER_SWING_DEG * s;
+    const bool frontRow = leg < 2;
+    const bool inwardPhase =
+        (frontRow && shoulderSwing < 0.f) || (!frontRow && shoulderSwing > 0.f);
+    if (inwardPhase) {
+      shoulderSwing *= WALK_SHOULDER_INNER_SCALE;
+      shoulderSwing =
+          constrain(shoulderSwing, -WALK_SHOULDER_INNER_MAX_DEG,
+                    WALK_SHOULDER_INNER_MAX_DEG);
+    }
+    const float shBase =
+        frontRow ? WALK_BASE_SHOULDER_FRONT_DEG : WALK_BASE_SHOULDER_REAR_DEG;
+    const float knBase =
+        frontRow ? WALK_BASE_KNEE_FRONT_DEG : WALK_BASE_KNEE_REAR_DEG;
+    const float shoulder = shBase + shoulderSwing;
+    float kneeLift = WALK_KNEE_LIFT_DEG * fmaxf(0.f, s);
+    if (inwardPhase && !frontRow) {
+      kneeLift *= WALK_KNEE_LIFT_INNER_SCALE;
+    }
+    const float knee = knBase + kneeLift;
     out[leg * 2] =
         static_cast<uint8_t>(constrain(shoulder, 0.f, 180.f));
     out[leg * 2 + 1] =
         static_cast<uint8_t>(constrain(knee, 0.f, 180.f));
+  }
+}
+
+/**
+ * FK 2R : θ1 = angle fémur depuis +x (rad), θ2 = angle tibia relatif au fémur (rad).
+ * Convention alignée sur les angles logiques : on pose θ1_deg = S, θ2_deg = K
+ * (calage nominal via STAND_LOW_GORILLA_DEG ; si ton méca diffère, ajuste les trims).
+ */
+void fkGorillaFootMm(float shoulderDeg, float kneeDeg, float *xMm, float *zMm) {
+  const float L1 = LEG_LINK_LENGTH_MM;
+  const float L2 = LEG_LINK_LENGTH_MM;
+  const float t1 = shoulderDeg * (static_cast<float>(PI) / 180.f);
+  const float t2 = kneeDeg * (static_cast<float>(PI) / 180.f);
+  *xMm = L1 * cosf(t1) + L2 * cosf(t1 + t2);
+  *zMm = L1 * sinf(t1) + L2 * sinf(t1 + t2);
+}
+
+bool ikGorillaFootMm(float xMm, float zMm, float *shoulderDeg, float *kneeDeg) {
+  const float L1 = LEG_LINK_LENGTH_MM;
+  const float L2 = LEG_LINK_LENGTH_MM;
+  const float r2 = xMm * xMm + zMm * zMm;
+  const float r = sqrtf(r2);
+  const float rMax = L1 + L2 - 0.5f;
+  float x = xMm;
+  float z = zMm;
+  if (r > rMax) {
+    const float s = rMax / (r + 1e-6f);
+    x *= s;
+    z *= s;
+  }
+  const float c2 = constrain(
+      (x * x + z * z - L1 * L1 - L2 * L2) / (2.f * L1 * L2), -1.f, 1.f);
+  const float s2 = sqrtf(fmaxf(0.f, 1.f - c2 * c2));
+  const float th2 = atan2f(s2, c2);
+  const float phi = atan2f(z, x);
+  const float psi =
+      atan2f(L2 * sinf(th2), L1 + L2 * cosf(th2));
+  const float th1 = phi - psi;
+  *shoulderDeg = th1 * (180.f / static_cast<float>(PI));
+  *kneeDeg = th2 * (180.f / static_cast<float>(PI));
+  return true;
+}
+
+void computeWalkGorillaAngles(float phase01, float moveX, float turnYaw,
+                              uint8_t out[8]) {
+  /**
+   * Trot diagonal : FL+RR vs FR+RL. Pied (x,z) en mm depuis l’épaule.
+   * Stance : glisse vers −x (poussée). Swing : remonte en z et avance en x.
+   */
+  const float p = phase01 * 2.f * PI;
+  const float off[4] = {0.f, PI, PI, 0.f};
+  const float mx = constrain(moveX, -1.f, 1.f);
+  const float yaw = constrain(turnYaw, -1.f, 1.f);
+
+  for (int leg = 0; leg < 4; leg++) {
+    const float s = sinf(p + off[leg]);
+    const float lift = fmaxf(0.f, s);
+    const float stance = fmaxf(0.f, -s);
+    const float lift2 = lift * lift;
+    const float stance2 = stance * stance;
+    const bool isLeft = (leg == 0 || leg == 2);
+
+    const float S0 = STAND_LOW_GORILLA_DEG[leg * 2];
+    const float K0 = STAND_LOW_GORILLA_DEG[leg * 2 + 1];
+    float x0 = 0.f;
+    float z0 = 0.f;
+    fkGorillaFootMm(S0, K0, &x0, &z0);
+    float Sn = 0.f;
+    float Kn = 0.f;
+    ikGorillaFootMm(x0, z0, &Sn, &Kn);
+    const float offS = S0 - Sn;
+    const float offK = K0 - Kn;
+
+    const float dxStance = -mx * WALK_GORILLA_STANCE_SLIDE_MM * stance2;
+    const float dxSwing = mx * WALK_GORILLA_STRIDE_MM * lift2;
+    const float dzSwing = -WALK_GORILLA_CLEARANCE_MM * lift2;
+    const float dxTurn =
+        yaw * WALK_GORILLA_TURN_STRIDE_MM * (isLeft ? 1.f : -1.f) * (lift2 + stance2);
+
+    const float xt = x0 + dxStance + dxSwing + dxTurn;
+    const float zt = z0 + dzSwing;
+
+    float S = S0;
+    float K = K0;
+    ikGorillaFootMm(xt, zt, &S, &K);
+    S = S + offS;
+    K = K + offK;
+
+    out[leg * 2] = static_cast<uint8_t>(constrain(S + 0.5f, 0.f, 180.f));
+    out[leg * 2 + 1] = static_cast<uint8_t>(constrain(K + 0.5f, 0.f, 180.f));
   }
 }
 
@@ -243,13 +355,15 @@ bool applyPoseBlend(uint8_t out[8]) {
 void taskServos(void *pvParameters) {
   initPwm();
 
-  LegCtrlMode mode = LegCtrlMode::Stand;
+  LegCtrlMode mode = LegCtrlMode::StandLowGround;
   float phase01 = 0.f;
   float walkSpeed = gRobotRuntime.walkSpeed;
+  float walkMoveX = gRobotRuntime.walkMoveX;
+  float walkTurnYaw = gRobotRuntime.walkTurnYaw;
   uint8_t angles[8];
   uint8_t poseAngles[8];
-  computeStandAngles(poseAngles);
-  computeStandAngles(angles);
+  computeStandLowGroundAngles(poseAngles);
+  computeStandLowGroundAngles(angles);
 
   TickType_t lastWake = xTaskGetTickCount();
   TickType_t lastTick = lastWake;
@@ -290,15 +404,40 @@ void taskServos(void *pvParameters) {
           memcpy(poseAngles, angles, sizeof(angles));
           break;
         }
+        case RobotCmdKind::ModeStandLowGorilla: {
+          mode = LegCtrlMode::StandLowGorilla;
+          uint8_t tgt[8];
+          computeStandLowGorillaAngles(tgt);
+          startPoseBlend(angles, tgt);
+          memcpy(poseAngles, angles, sizeof(angles));
+          break;
+        }
         case RobotCmdKind::ModeWalk:
           cancelPoseBlend();
           mode = LegCtrlMode::Walk;
+          phase01 = 0.f;
           if (cmd.value > 0.05f && cmd.value <= 1.f) {
             walkSpeed = cmd.value;
           }
+          walkMoveX = cmd.moveX;
+          walkTurnYaw = cmd.turnYaw;
+          break;
+        case RobotCmdKind::ModeWalkGorilla:
+          cancelPoseBlend();
+          mode = LegCtrlMode::WalkGorilla;
+          phase01 = 0.f;
+          if (cmd.value > 0.05f && cmd.value <= 1.f) {
+            walkSpeed = cmd.value;
+          }
+          walkMoveX = cmd.moveX;
+          walkTurnYaw = cmd.turnYaw;
           break;
         case RobotCmdKind::SetWalkSpeed:
           walkSpeed = constrain(cmd.value, 0.1f, 1.f);
+          break;
+        case RobotCmdKind::SetWalkMotion:
+          walkMoveX = cmd.moveX;
+          walkTurnYaw = cmd.turnYaw;
           break;
         case RobotCmdKind::ServoAngle:
           cancelPoseBlend();
@@ -338,6 +477,15 @@ void taskServos(void *pvParameters) {
         memcpy(poseAngles, angles, sizeof(poseAngles));
         break;
       }
+      case LegCtrlMode::StandLowGorilla: {
+        uint8_t nominal[8];
+        computeStandLowGorillaAngles(nominal);
+        if (!applyPoseBlend(angles)) {
+          memcpy(angles, nominal, sizeof(angles));
+        }
+        memcpy(poseAngles, angles, sizeof(poseAngles));
+        break;
+      }
       case LegCtrlMode::Walk: {
         const float step =
             (dtMs / static_cast<float>(WALK_CYCLE_MS)) * walkSpeed;
@@ -346,6 +494,17 @@ void taskServos(void *pvParameters) {
           phase01 -= 1.f;
         }
         computeWalkAngles(phase01, angles);
+        memcpy(poseAngles, angles, sizeof(poseAngles));
+        break;
+      }
+      case LegCtrlMode::WalkGorilla: {
+        const float step =
+            (dtMs / static_cast<float>(WALK_GORILLA_CYCLE_MS)) * walkSpeed;
+        phase01 += step;
+        if (phase01 >= 1.f) {
+          phase01 -= 1.f;
+        }
+        computeWalkGorillaAngles(phase01, walkMoveX, walkTurnYaw, angles);
         memcpy(poseAngles, angles, sizeof(poseAngles));
         break;
       }
@@ -364,6 +523,8 @@ void taskServos(void *pvParameters) {
       gRobotRuntime.mode = mode;
       gRobotRuntime.gaitPhase01 = phase01;
       gRobotRuntime.walkSpeed = walkSpeed;
+      gRobotRuntime.walkMoveX = walkMoveX;
+      gRobotRuntime.walkTurnYaw = walkTurnYaw;
       memcpy(gRobotRuntime.anglesDeg, angles, sizeof(angles));
       xSemaphoreGive(mutexRobotRuntime);
     }

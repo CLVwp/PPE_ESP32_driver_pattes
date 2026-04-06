@@ -62,6 +62,16 @@ constexpr float STAND_HEIGHT_MM = 2.f * LEG_LINK_LENGTH_MM;
  */
 constexpr float STAND_LOW_HEIGHT_FRONT_ROW_MM = 167.f;
 constexpr float STAND_LOW_HEIGHT_REAR_ROW_MM = 130.f;
+/**
+ * Pose stand_low "gorille" en angles directs (FL..RR : épaule puis genou).
+ * Issue de ton calage manuel `srv`.
+ */
+constexpr float STAND_LOW_GORILLA_DEG[8] = {
+    150.f, 80.f,   // FL, FR (avant)
+    150.f, 80.f,
+    150.f, 0.f,    // RL, RR (arrière)
+    150.f, 0.f
+};
 
 /** Hauteur minimale (mm) pour éviter acos instable ; reste sous la cible IK. */
 constexpr float IK_HEIGHT_MIN_MM = 50.f;
@@ -74,16 +84,50 @@ constexpr float IK_HEIGHT_MIN_MM = 50.f;
 constexpr float IK_KNEE_GAIN_FRONT = 1.05f;
 constexpr float IK_KNEE_GAIN_REAR = 115.f / 120.f;
 
-/** Oscillation de marche autour des neutres stand (trot diagonal). */
-constexpr float WALK_SHOULDER_SWING_DEG = 22.f;
-constexpr float WALK_KNEE_LIFT_DEG = 28.f;
-constexpr uint32_t WALK_CYCLE_MS = 720;
+/**
+ * Pose de base en marche (différente du stand IK) : posture basse / large, proche du schéma « gorille ».
+ * Plus les genoux sont fléchis (valeurs plus élevées ici), plus le corps est près du sol.
+ */
+constexpr float WALK_BASE_SHOULDER_FRONT_DEG = 112.f;
+constexpr float WALK_BASE_SHOULDER_REAR_DEG = 66.f;
+constexpr float WALK_BASE_KNEE_FRONT_DEG = 105.f;
+constexpr float WALK_BASE_KNEE_REAR_DEG = 108.f;
+
+/** Oscillation autour de ces bases (trot diagonal). Réduire si les pattes se croisent encore. */
+constexpr float WALK_SHOULDER_SWING_DEG = 14.f;
+/** Réduction de l'amplitude sur la phase qui rapproche AV/ARR d'un même côté. */
+constexpr float WALK_SHOULDER_INNER_SCALE = 0.35f;
+/**
+ * Butée dure sur l'offset d'épaule pendant cette phase intérieure (deg).
+ * Plus petit => moins de risque que les jambes se touchent.
+ */
+constexpr float WALK_SHOULDER_INNER_MAX_DEG = 2.f;
+/**
+ * Relevé de genou en phase d’oscillation (trot : pattes en diagonale décollent un peu).
+ * Plus petit = pieds restent plus près du sol pendant la marche.
+ */
+constexpr float WALK_KNEE_LIFT_DEG = 9.f;
+/** En phase intérieure, le genou AR (s>0) relevait fort : facteur < 1 pour éviter le croisement. */
+constexpr float WALK_KNEE_LIFT_INNER_SCALE = 0.2f;
+constexpr uint32_t WALK_CYCLE_MS = 1200;//720;
+
+/**
+ * Marche `walk_gorille` : IK 2D (pied x,z en mm, épaule à l’origine, +x avant, +z bas).
+ * Les angles logiques de `STAND_LOW_GORILLA_DEG` sont interprétés comme θ1/θ2 géométriques (deg)
+ * pour le FK/IK (voir commentaire dans task_servos.cpp).
+ * moveX / turnYaw : facteurs -1..1 sur les amplitudes ci‑dessous.
+ */
+constexpr float WALK_GORILLA_STRIDE_MM = 22.f;
+constexpr float WALK_GORILLA_CLEARANCE_MM = 26.f;
+constexpr float WALK_GORILLA_STANCE_SLIDE_MM = 18.f;
+constexpr float WALK_GORILLA_TURN_STRIDE_MM = 10.f;
+constexpr uint32_t WALK_GORILLA_CYCLE_MS = 1400;
 
 /**
  * Durée de fusion entre deux poses prédéfinies (stand ↔ stand_low, etc.).
  * Les 8 servos interpolent ensemble (smoothstep) pour limiter les trajets bancals
  * où un axe arrive avant l’autre ; ajuster au ressenti (300–800 ms typique).
  */
-constexpr uint32_t POSE_BLEND_DURATION_MS = 480;
+constexpr uint32_t POSE_BLEND_DURATION_MS = 1200; // 480
 
 }  // namespace RobotConfig

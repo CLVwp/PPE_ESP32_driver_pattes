@@ -12,6 +12,8 @@ void robotStateInit() {
   gRobotRuntime.mode = LegCtrlMode::Stand;
   gRobotRuntime.gaitPhase01 = 0.f;
   gRobotRuntime.walkSpeed = 0.55f;
+  gRobotRuntime.walkMoveX = 1.f;
+  gRobotRuntime.walkTurnYaw = 0.f;
   for (int i = 0; i < 8; i++) {
     gRobotRuntime.anglesDeg[i] = static_cast<uint8_t>(
         (i % 2 == 0) ? RobotConfig::NEUTRAL_SHOULDER_DEG
