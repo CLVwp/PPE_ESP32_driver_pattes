@@ -201,7 +201,20 @@ void computeWalkGorillaAngles(float phase01, float moveX, float turnYaw,
     const float stance = fmaxf(0.f, -s);
     const float lift2 = lift * lift;
     const float stance2 = stance * stance;
+    const bool frontRow = leg < 2;
     const bool isLeft = (leg == 0 || leg == 2);
+    const float strideScale =
+        frontRow ? WALK_GORILLA_FRONT_STRIDE_SCALE : 1.f;
+    const float clearanceScale =
+        frontRow ? WALK_GORILLA_FRONT_CLEARANCE_SCALE : 1.f;
+    const float stanceScale =
+        frontRow ? WALK_GORILLA_FRONT_STANCE_SCALE : 1.f;
+    const float liftWave =
+        frontRow ? constrain(lift * WALK_GORILLA_FRONT_LIFT_BOOST, 0.f, 1.f)
+                 : lift2;
+    const float stanceWave =
+        frontRow ? constrain(stance * WALK_GORILLA_FRONT_TRACTION_BOOST, 0.f, 1.f)
+                 : stance2;
 
     const float S0 = STAND_LOW_GORILLA_DEG[leg * 2];
     const float K0 = STAND_LOW_GORILLA_DEG[leg * 2 + 1];
@@ -214,9 +227,12 @@ void computeWalkGorillaAngles(float phase01, float moveX, float turnYaw,
     const float offS = S0 - Sn;
     const float offK = K0 - Kn;
 
-    const float dxStance = -mx * WALK_GORILLA_STANCE_SLIDE_MM * stance2;
-    const float dxSwing = mx * WALK_GORILLA_STRIDE_MM * lift2;
-    const float dzSwing = -WALK_GORILLA_CLEARANCE_MM * lift2;
+    const float dxStance =
+        -mx * WALK_GORILLA_STANCE_SLIDE_MM * stanceScale * stanceWave;
+    const float dxSwing =
+        mx * WALK_GORILLA_STRIDE_MM * strideScale * liftWave;
+    const float dzSwing =
+        -WALK_GORILLA_CLEARANCE_MM * clearanceScale * liftWave;
     const float dxTurn =
         yaw * WALK_GORILLA_TURN_STRIDE_MM * (isLeft ? 1.f : -1.f) * (lift2 + stance2);
 

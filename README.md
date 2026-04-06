@@ -92,8 +92,10 @@ Paramètres :
 - **`yaw`** : rotation (**-1** tourne gauche, **+1** tourne droite)
 
 ```json
-{ "t": "cmd", "m": "walk_gorille", "v": 0.45, "x": 1, "yaw": 0 }
+{ "t": "cmd", "m": "walk_gorille", "v": 0.75, "x": 1, "yaw": 0 }
 ```
+
+w
 
 ```json
 { "t": "cmd", "m": "walk_gorille", "v": 0.35, "x": -0.6, "yaw": 0 }

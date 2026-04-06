@@ -121,6 +121,13 @@ constexpr float WALK_GORILLA_STRIDE_MM = 22.f;
 constexpr float WALK_GORILLA_CLEARANCE_MM = 26.f;
 constexpr float WALK_GORILLA_STANCE_SLIDE_MM = 18.f;
 constexpr float WALK_GORILLA_TURN_STRIDE_MM = 10.f;
+/** Gains par rangée pour corriger un avant trop passif. */
+constexpr float WALK_GORILLA_FRONT_STRIDE_SCALE = 1.45f;
+constexpr float WALK_GORILLA_FRONT_CLEARANCE_SCALE = 1.8f;
+constexpr float WALK_GORILLA_FRONT_STANCE_SCALE = 1.35f;
+/** Rend l'avant plus nerveux en swing/traction. */
+constexpr float WALK_GORILLA_FRONT_LIFT_BOOST = 1.55f;
+constexpr float WALK_GORILLA_FRONT_TRACTION_BOOST = 1.45f;
 constexpr uint32_t WALK_GORILLA_CYCLE_MS = 1400;
 
 /**
