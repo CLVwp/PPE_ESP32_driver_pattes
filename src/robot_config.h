@@ -30,7 +30,12 @@ constexpr bool SERVO_ANGLE_MIRROR[8] = {
  * Positif = même sens qu’une augmentation d’angle logique sur ce servo.
  * À régler au banc pour aligner stand / pose « tous à 90° » ; la télémétrie reste **sans** trim.
  */
-constexpr float SERVO_TRIM_DEG[8] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+constexpr float SERVO_TRIM_DEG[8] = {
+    +2.0f, -4.0f,  // FL: épaule un peu plus basse + genou un peu plus tendu
+    0.f,   0.f,    // FR
+    0.f,   0.f,    // RL
+    0.f,   0.f     // RR
+};
 
 /**
  * Impulsion min / max pour 0° et 180°.

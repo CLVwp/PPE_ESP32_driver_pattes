@@ -15,17 +15,23 @@
  *
  * Pi → ESP32  (commandes) :
  *   {"t":"cmd","m":"stand"}
- *   {"t":"cmd","m":"stand_low"}   // stand bas IK (hauteurs dans robot_config.h)
- *   {"t":"cmd","m":"stand_low_gorille"} // stand bas "gorille" (angles directs)
- *   {"t":"cmd","m":"walk","v":0.7}     // v optionnel, 0.1–1.0 = vitesse relative
+ *   {"t":"cmd","m":"stand_low"}   
+ * stand bas IK (hauteurs dans robot_config.h)
+ *   {"t":"cmd","m":"stand_low_gorille"} 
+ *  stand bas "gorille" (angles directs)
+ *   {"t":"cmd","m":"walk","v":0.7}     
+ * v optionnel, 0.1–1.0 = vitesse relative
  *   {"t":"cmd","m":"walk_gorille","v":0.45,"x":1,"yaw":0}
- *   {"t":"cmd","m":"motion","x":-1,"yaw":0.3} // ajuste direction à chaud
- *   {"t":"cmd","m":"speed","v":0.5}    // en mode marche
- *   {"t":"srv","i":0,"a":90}           // servo i (0–7), angle °, passe en mode pose
+ *   {"t":"cmd","m":"motion","x":-1,"yaw":0.3} 
+ * ajuste direction à chaud
+ *   {"t":"cmd","m":"speed","v":0.5}    
+ * en mode marche
+ *   {"t":"srv","i":0,"a":90}           
+ * servo i (0–7), angle °, passe en mode pose
  */
 
 /** À remettre à true pour réafficher la télémétrie JSON sur le Serial. */
-static constexpr bool kSerialTelemetryOut = false;
+static constexpr bool kSerialTelemetryOut = true;
 
 static void serialAckOk(const char *m) {
   if (kSerialTelemetryOut) {

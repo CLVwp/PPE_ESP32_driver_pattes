@@ -338,3 +338,8 @@ pio device monitor -b 115200
 ##
 
 picocom -b 115200 /dev/ttyUSBx
+
+{ "t": "cmd", "m": "stand_low" }
+{ "t": "cmd", "m": "stand_low_gorille" }
+{ "t": "cmd", "m": "walk_gorille", "v": 0.65, "x": 0.9, "yaw": 0 }
+{ "t": "cmd", "m": "motion", "x": 0.8, "yaw": -0.4 }
